@@ -6,6 +6,7 @@ Authors: DebarghaG
 import GrammarsFormalUncertainty.Lean.Extract
 import GrammarsFormalUncertainty.Metrics
 import Lean.Util.Path
+import Std
 
 /-!
 # PCFG Extraction CLI Tool
@@ -17,6 +18,43 @@ computing uncertainty metrics.
 namespace GrammarsFormalUncertainty.Lean
 
 open _root_.Lean
+
+/-- Count digit characters in a string (ignores underscores). -/
+def countDigits (s : String) : Nat :=
+  s.toList.foldl (fun acc c => if c.isDigit then acc + 1 else acc) 0
+
+/-- Parse a non-negative decimal float with optional fractional part. -/
+def parseNonNegFloat (s : String) : Option Float :=
+  let parts := s.splitOn "."
+  match parts with
+  | [intPart] =>
+    if intPart.isEmpty then none
+    else intPart.toNat?.map (·.toFloat)
+  | [intPart, fracPart] =>
+    if intPart.isEmpty && fracPart.isEmpty then
+      none
+    else
+      let intVal? := if intPart.isEmpty then some 0 else intPart.toNat?
+      let fracVal? := if fracPart.isEmpty then some 0 else fracPart.toNat?
+      match intVal?, fracVal? with
+      | some intVal, some fracVal =>
+        let fracDigits := countDigits fracPart
+        let frac := if fracDigits == 0 then 0 else fracVal.toFloat / Float.pow 10 fracDigits.toFloat
+        some (intVal.toFloat + frac)
+      | _, _ => none
+  | _ => none
+
+/-- Parse a signed decimal float (no exponent). -/
+def parseSignedFloat (s : String) : Option Float :=
+  match s.toList with
+  | [] => none
+  | c :: cs =>
+    if c == '-' then
+      parseNonNegFloat (String.ofList cs) |>.map (fun v => -v)
+    else if c == '+' then
+      parseNonNegFloat (String.ofList cs)
+    else
+      parseNonNegFloat s
 
 /-- Command-line options for the PCFG extraction tool -/
 structure Options where
@@ -85,9 +123,15 @@ def parseArgs (args : List String) : ParseResult :=
     | "--entropy" :: rest =>
       go rest { opts with showEntropy := true }
     | "--smooth" :: alpha :: rest =>
-      -- Parse float by trying to convert string
-      let alphaVal := alpha.toNat?.getD 1 |>.toFloat
-      go rest { opts with smoothingAlpha := alphaVal }
+      -- Assumption: smoothing alpha is a non-negative decimal float; invalid inputs are errors.
+      match parseSignedFloat alpha with
+      | some alphaVal =>
+        if alphaVal < 0 then
+          .error s!"Smoothing alpha must be non-negative: {alpha}"
+        else
+          go rest { opts with smoothingAlpha := alphaVal }
+      | none =>
+        .error s!"Invalid float for --smooth: {alpha}"
     | "--metrics" :: rest =>
       go rest { opts with showMetrics := true }
     | "--spectral" :: rest =>
@@ -95,9 +139,16 @@ def parseArgs (args : List String) : ParseResult :=
     | "--confidence" :: rest =>
       go rest { opts with showConfidence := true }
     | "--confidence-level" :: level :: rest =>
-      -- Parse float for confidence level
-      let levelVal := (level.toNat?.getD 95).toFloat / 100.0
-      go rest { opts with confidenceLevel := levelVal }
+      -- Assumption: values > 1 are percentages (e.g., 95 => 0.95) for backward compatibility.
+      match parseSignedFloat level with
+      | some rawLevel =>
+        let levelVal := if rawLevel > 1.0 then rawLevel / 100.0 else rawLevel
+        if levelVal <= 0 || levelVal > 1.0 then
+          .error s!"Confidence level must be in (0, 1]: {level}"
+        else
+          go rest { opts with confidenceLevel := levelVal }
+      | none =>
+        .error s!"Invalid float for --confidence-level: {level}"
     | "-h" :: _ | "--help" :: _ =>
       .helpRequested
     | path :: rest =>

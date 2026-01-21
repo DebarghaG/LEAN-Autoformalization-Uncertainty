@@ -38,11 +38,13 @@ def computeProbabilities (counts : PCFGCounts) (startSymbols : Array NonTerminal
 
   for (lhs, rhsMap) in counts.rules do
     nonTerminals := nonTerminals.insert lhs
-    let total := counts.lhsCounts.getD lhs 1  -- Avoid division by zero
+    -- Assumption: RHS map counts are authoritative if lhsCounts is missing or inconsistent.
+    let total := rhsMap.fold (init := 0) (fun acc _ count => acc + count)
     let mut weightedRules : Array WeightedRule := #[]
 
     for (rhs, count) in rhsMap do
-      let prob := count.toFloat / total.toFloat
+      -- Assumption: if total is 0 (degenerate input), all rule probabilities are 0.
+      let prob := if total == 0 then 0 else count.toFloat / total.toFloat
       let rule : ProductionRule := { lhs, rhs, count }
       weightedRules := weightedRules.push { rule, probability := prob }
 
@@ -69,14 +71,16 @@ def computeProbabilitiesSmoothed (counts : PCFGCounts) (alpha : Float := 1.0)
 
   for (lhs, rhsMap) in counts.rules do
     nonTerminals := nonTerminals.insert lhs
-    let total := counts.lhsCounts.getD lhs 1
+    -- Assumption: RHS map counts are authoritative if lhsCounts is missing or inconsistent.
+    let total := rhsMap.fold (init := 0) (fun acc _ count => acc + count)
     let vocabSize := rhsMap.size  -- Number of distinct RHS for this LHS
     let smoothedTotal := total.toFloat + alpha * vocabSize.toFloat
     let mut weightedRules : Array WeightedRule := #[]
 
     for (rhs, count) in rhsMap do
       let smoothedCount := count.toFloat + alpha
-      let prob := smoothedCount / smoothedTotal
+      -- Assumption: if smoothedTotal is 0 (alpha=0 and total=0), all rule probabilities are 0.
+      let prob := if smoothedTotal <= 0 then 0 else smoothedCount / smoothedTotal
       let rule : ProductionRule := { lhs, rhs, count }
       weightedRules := weightedRules.push { rule, probability := prob }
 
@@ -125,10 +129,11 @@ def grammarEntropy (pcfg : PCFG) (counts : PCFGCounts) : Float := Id.run do
 Compute average per-decision entropy (unweighted mean).
 -/
 def averageEntropy (pcfg : PCFG) : Float := Id.run do
-  if pcfg.nonTerminals.isEmpty then return 0
+  -- Assumption: average entropy is computed over non-terminals that have productions (LHS only).
+  if pcfg.rules.isEmpty then return 0
   let mut totalEntropy : Float := 0
   let mut count : Nat := 0
-  for nt in pcfg.nonTerminals do
+  for (nt, _) in pcfg.rules do
     totalEntropy := totalEntropy + entropyFor pcfg nt
     count := count + 1
   return totalEntropy / count.toFloat
@@ -215,7 +220,8 @@ Compute entropy statistics for all non-terminals.
 -/
 def computeEntropyStats (pcfg : PCFG) (counts : PCFGCounts) : Array NTEntropyStats := Id.run do
   let mut stats : Array NTEntropyStats := #[]
-  for nt in pcfg.nonTerminals do
+  -- Assumption: entropy stats are defined for non-terminals that appear on LHS (have rules).
+  for (nt, _) in pcfg.rules do
     let h := entropyFor pcfg nt
     let numRules := (pcfg.rules.getD nt #[]).size
     let totalCount := counts.lhsCounts.getD nt 0

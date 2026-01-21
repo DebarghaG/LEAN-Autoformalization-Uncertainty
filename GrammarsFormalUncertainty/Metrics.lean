@@ -501,9 +501,17 @@ def collectAllProbabilities (pcfg : PCFG) : Array Float := Id.run do
       probs := probs.push wr.probability
   probs
 
+/-- Normalize an array of probabilities to sum to 1.
+    Returns empty if total mass is non-positive. -/
+def normalizeDistribution (probs : Array Float) : Array Float :=
+  let total := probs.foldl (· + ·) 0
+  -- Assumption: entropy/divergence metrics treat the grammar as a global distribution over rules.
+  if total <= 0 then #[] else probs.map (· / total)
+
 /-- Compute comprehensive entropy metrics -/
 def computeEntropyMetricsStruct (pcfg : PCFG) (counts : PCFGCounts) : EntropyMetrics :=
-  let probs := collectAllProbabilities pcfg
+  -- Assumption: for entropy/KL over the whole grammar, normalize all rule probabilities to a single distribution.
+  let probs := normalizeDistribution (collectAllProbabilities pcfg)
   { shannonEntropy := entropyOfDistribution probs
     renyiEntropy0 := renyiEntropy probs 0
     renyiEntropy2 := renyiEntropy probs 2
@@ -515,6 +523,7 @@ def computeEntropyMetricsStruct (pcfg : PCFG) (counts : PCFGCounts) : EntropyMet
 
 /-- Compute distribution statistics for all rule probabilities -/
 def computeProbabilityDistributionStats (pcfg : PCFG) : DistributionStats :=
+  -- Assumption: distribution stats are descriptive over raw rule probabilities (not normalized).
   computeDistributionStats (collectAllProbabilities pcfg)
 
 /-! ## Main Entry Point -/
