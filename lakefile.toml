@@ -1,0 +1,37 @@
+name = "GrammarsFormalUncertainty"
+version = "0.1.0"
+defaultTargets = ["GrammarsFormalUncertainty"]
+
+# Core library (standalone, no Lean internals dependency)
+[[lean_lib]]
+name = "GrammarsFormalUncertainty"
+
+# Lean integration library (requires Lean internals)
+[[lean_lib]]
+name = "GrammarsFormalUncertaintyLean"
+
+# Test libraries (directly referencing test files)
+[[lean_lib]]
+name = "Basic"
+roots = ["tests.Basic"]
+
+[[lean_lib]]
+name = "Entropy"
+roots = ["tests.Entropy"]
+
+[[lean_lib]]
+name = "Metrics"
+roots = ["tests.Metrics"]
+
+[[lean_lib]]
+name = "LeanExtract"
+roots = ["tests.LeanExtract"]
+
+[[lean_lib]]
+name = "LeanIntegration"
+roots = ["tests.LeanIntegration"]
+
+# CLI executable
+[[lean_exe]]
+name = "gfu"
+root = "GrammarsFormalUncertainty.Lean.Main"
