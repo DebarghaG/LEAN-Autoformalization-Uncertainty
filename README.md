@@ -63,3 +63,16 @@ lake build Basic Entropy Metrics LeanExtract LeanIntegration
 ## License
 
 Apache 2.0
+
+## Citation
+
+```bibtex
+@inproceedings{
+ganguly2025grammars,
+title={Grammars of Formal Uncertainty: When to Trust {LLM}s in Automated Reasoning Tasks},
+author={Debargha Ganguly and Vikash Singh and Sreehari Sankar and Biyao Zhang and Xuecen Zhang and Srinivasan Iyengar and Xiaotian Han and Amit Sharma and Shivkumar Kalyanaraman and Vipin Chaudhary},
+booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems},
+year={2025},
+url={https://openreview.net/forum?id=QfKpJ00t2L}
+}
+```
